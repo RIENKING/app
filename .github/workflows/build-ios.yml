@@ -1,0 +1,58 @@
+name: Build TouchForge iOS (.ipa)
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-ipa:
+    name: Compile TouchForge.ipa (Unsigned)
+    runs-on: macos-15
+
+    defaults:
+      run:
+        working-directory: TouchForge
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check Xcode version
+        run: |
+          xcodebuild -version
+          xcrun --sdk iphoneos --show-sdk-version
+
+      - name: Build TouchForge for iPhone (Release, Unsigned)
+        run: |
+          xcodebuild \
+            -project TouchForge.xcodeproj \
+            -scheme TouchForge \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            clean build
+
+      - name: Package TouchForge.ipa
+        run: |
+          mkdir -p build/ipa/Payload
+          APP_PATH="build/DerivedData/Build/Products/Release-iphoneos/TouchForge.app"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "Error: TouchForge.app not found at $APP_PATH"
+            exit 1
+          fi
+          cp -R "$APP_PATH" build/ipa/Payload/
+          cd build/ipa
+          zip -r -9 ../../TouchForge.ipa Payload
+          cd ../..
+          ls -lh TouchForge.ipa
+
+      - name: Upload TouchForge.ipa Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TouchForge-iOS-IPA
+          path: TouchForge/TouchForge.ipa
+          retention-days: 30
